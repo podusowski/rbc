@@ -45,13 +45,61 @@ async fn node(addr: SocketAddr) {
 
     // https://developer.bitcoin.org/reference/p2p_networking.html#message-headers
     // start string
-    stream.write_all(&0xf9beb4d9u32.to_le_bytes()).await.unwrap();
+    stream
+        .write_all(&0xf9beb4d9u32.to_le_bytes())
+        .await
+        .unwrap();
     // command
-    write_padded_bytes(&mut stream, b"ping", 12).await;
+    write_padded_bytes(&mut stream, b"version", 12).await;
     // content length
     stream.write_all(&0u32.to_le_bytes()).await.unwrap();
     // checksum
-    stream.write_all(&0x5df6e0e2u32.to_le_bytes()).await.unwrap();
+    stream
+        .write_all(&0x5df6e0e2u32.to_le_bytes())
+        .await
+        .unwrap();
+
+    // version payload
+
+    // Protocol version. 70015 was the highest by the time this was written.
+    stream.write_all(&70015u32.to_le_bytes()).await.unwrap();
+
+    // Services. We support none.
+    stream.write_all(&0u64.to_le_bytes()).await.unwrap();
+
+    // Current timestamp.
+    let timestamp: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    stream.write_all(&timestamp.to_le_bytes()).await.unwrap();
+
+    // Services of the other node. We support none.
+    stream.write_all(&0u64.to_le_bytes()).await.unwrap();
+
+    // "The IPv6 address of the receiving node as perceived by the transmitting node"
+    stream.write_all(&std::net::Ipv6Addr::LOCALHOST.octets()).await.unwrap();
+
+    // Port. Note the Big Endian.
+    stream.write_all(&0u16.to_be_bytes()).await.unwrap();
+
+    // Services. Again?
+    stream.write_all(&0u64.to_le_bytes()).await.unwrap();
+
+    // The IPv6 address of the transmitting node.
+    stream.write_all(&std::net::Ipv6Addr::LOCALHOST.octets()).await.unwrap();
+
+    // Port. Note the Big Endian.
+    stream.write_all(&0u16.to_be_bytes()).await.unwrap();
+
+    // Nonce. Not important for now.
+    stream.write_all(&0u64.to_le_bytes()).await.unwrap();
+
+    // Length of the user agent.
+    stream.write_all(&[0]).await.unwrap();
+
+    // Height.
+    stream.write_all(&0u32.to_le_bytes()).await.unwrap();
 
     let ans = stream.read_u8().await.unwrap();
     println!("{}", ans);
