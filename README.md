@@ -1,0 +1,1 @@
+RBC is a Bitcoin client written for educational purposes.

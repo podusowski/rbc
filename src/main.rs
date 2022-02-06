@@ -5,6 +5,9 @@ use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 mod utils;
 
+/// The Bitcoin message header contains length and checksum of the payload that
+/// follows. Because of that, it's not possible to encode it in a single pass
+/// and some intermediate form is needed.
 struct BitcoinMessage {
     header: [u8; 4 + 12 + 4 + 4],
     // TODO: Optimize this!
