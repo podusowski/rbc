@@ -1,5 +1,6 @@
-use std::{io::Write, net::SocketAddr};
+use std::{hash, io::Write, net::SocketAddr};
 
+use sha2::Digest;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 mod utils;
@@ -70,10 +71,35 @@ impl BitcoinMessage {
         &mut self.header[16..20]
     }
 
+    fn payload_hash(&mut self) -> &mut [u8] {
+        &mut self.header[20..24]
+    }
+
+    fn calculate_payload_hash(&self) -> [u8; 4] {
+        // First pass.
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&self.payload);
+        let first = hasher.finalize();
+
+        // Second pass.
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(first);
+
+        let mut hash: [u8; 4] = Default::default();
+        hash.copy_from_slice(&hasher.finalize()[..4]);
+        hash
+    }
+
     async fn write(mut self, sink: &mut (impl AsyncWrite + Unpin)) {
+        // Finalize the message.
         let payload_len = self.payload.len() as u32;
         self.content_length()
             .copy_from_slice(&payload_len.to_le_bytes());
+
+        let hash = self.calculate_payload_hash();
+        self.payload_hash().copy_from_slice(&hash);
+
+        // Flush.
         sink.write_all(&self.header).await.unwrap();
         sink.write_all(&self.payload).await.unwrap();
     }
