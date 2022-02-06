@@ -25,15 +25,18 @@ impl BitcoinMessage {
 
         // https://developer.bitcoin.org/reference/p2p_networking.html#message-headers
 
-        // start string
+        // Magic start string. Common for all messages.
         header.write_all(&0xf9beb4d9u32.to_be_bytes()).unwrap();
 
-        // command
+        // Command, or type of the message.
         utils::write_padded_bytes(&mut header, b"version", 12);
 
-        // content length
+        // Length of the payload that follows the header. Set to zero, can be
+        // changed later.
         header.write_all(&0u32.to_le_bytes()).unwrap();
-        // checksum
+
+        // Checksum of the payload. Set to the empty string, can be changed
+        // later.
         header.write_all(&0x5df6e0e2u32.to_le_bytes()).unwrap();
 
         message
