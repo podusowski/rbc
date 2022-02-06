@@ -1,40 +1,9 @@
-use std::{hash, io::Write, net::SocketAddr};
+use std::{io::Write, net::SocketAddr};
 
 use sha2::Digest;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 mod utils;
-
-fn write_padded_bytes(sink: &mut impl Write, buf: &[u8], total_length: usize) {
-    sink.write_all(buf).unwrap();
-    assert!(
-        buf.len() <= total_length,
-        "resulting write would be bigger than `total_length`"
-    );
-    for _ in 0..total_length - buf.len() {
-        sink.write(&[0]).unwrap();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smaller_data_gets_additional_padding() {
-        let mut sink = Vec::new();
-        write_padded_bytes(&mut sink, &[1], 2);
-        assert_eq!(vec![1, 0], sink);
-    }
-
-    #[test]
-    #[should_panic = "resulting write would be bigger than `total_length`"]
-    fn panic_when_data_does_not_fit() {
-        let mut sink = Vec::new();
-        write_padded_bytes(&mut sink, &[1, 2, 3], 2);
-        assert_eq!(vec![1, 0], sink);
-    }
-}
 
 struct BitcoinMessage {
     header: [u8; 4 + 12 + 4 + 4],
@@ -57,7 +26,7 @@ impl BitcoinMessage {
         header.write_all(&0xf9beb4d9u32.to_be_bytes()).unwrap();
 
         // command
-        write_padded_bytes(&mut header, b"version", 12);
+        utils::write_padded_bytes(&mut header, b"version", 12);
 
         // content length
         header.write_all(&0u32.to_le_bytes()).unwrap();
