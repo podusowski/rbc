@@ -86,7 +86,7 @@ impl BitcoinMessage {
 async fn node(addr: SocketAddr) {
     // https://developer.bitcoin.org/devguide/p2p_network.html#connecting-to-peers
     println!("connecting to {}", addr);
-    let mut sock = tokio::net::TcpSocket::new_v4().unwrap();
+    let sock = tokio::net::TcpSocket::new_v4().unwrap();
     let mut stream = sock.connect(addr).await.unwrap();
 
     let mut version = BitcoinMessage::new();
