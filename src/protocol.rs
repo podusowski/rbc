@@ -16,6 +16,9 @@ pub(crate) struct BitcoinMessage {
 #[derive(Default)]
 pub(crate) struct BitcoinHeader {
     magic: Magic,
+    command: Command,
+    payload_length: u32,
+    payload_hash: u32,
 }
 
 impl BitcoinHeader {
@@ -34,6 +37,7 @@ impl Magic {
     }
 }
 
+#[derive(Default)]
 struct Command {
     command: &'static [u8],
 }
@@ -50,6 +54,17 @@ impl Command {
             sink.write(&[0])?;
         }
         Ok(())
+    }
+}
+
+trait BitconSerializable {
+    fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
+}
+
+/// Serialization for fixed-sized ints. Note: LE only.
+impl BitconSerializable for u32 {
+    fn write_to(&self, _: &mut impl Write) -> std::io::Result<()> {
+        todo!()
     }
 }
 
