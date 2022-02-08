@@ -1,5 +1,5 @@
-use std::io::Write;
 use sha2::Digest;
+use std::io::Write;
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
@@ -79,5 +79,97 @@ impl BitcoinMessage {
 
     pub fn payload_writer(&mut self) -> &mut impl Write {
         &mut self.payload
+    }
+}
+
+fn build_version() -> BitcoinMessage {
+    let mut version = BitcoinMessage::new();
+
+    // Protocol version. 70015 was the highest by the time this was written.
+    version
+        .payload_writer()
+        .write_all(&70015u32.to_le_bytes())
+        .unwrap();
+
+    // Services. We support none.
+    version
+        .payload_writer()
+        .write_all(&0u64.to_le_bytes())
+        .unwrap();
+
+    // Current timestamp.
+    let timestamp: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    version
+        .payload_writer()
+        .write_all(&timestamp.to_le_bytes())
+        .unwrap();
+
+    // Services of the other node. We support none.
+    version
+        .payload_writer()
+        .write_all(&0u64.to_le_bytes())
+        .unwrap();
+
+    // "The IPv6 address of the receiving node as perceived by the transmitting node"
+    version
+        .payload_writer()
+        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
+        .unwrap();
+
+    // Port. Note the Big Endian.
+    version
+        .payload_writer()
+        .write_all(&0u16.to_be_bytes())
+        .unwrap();
+
+    // Services. Again?
+    version
+        .payload_writer()
+        .write_all(&0u64.to_le_bytes())
+        .unwrap();
+
+    // The IPv6 address of the transmitting node.
+    version
+        .payload_writer()
+        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
+        .unwrap();
+
+    // Port. Note the Big Endian.
+    version
+        .payload_writer()
+        .write_all(&0u16.to_be_bytes())
+        .unwrap();
+
+    // Nonce. Not important for now.
+    version
+        .payload_writer()
+        .write_all(&0u64.to_le_bytes())
+        .unwrap();
+
+    // Length of the user agent.
+    version.payload_writer().write_all(&[0]).unwrap();
+
+    // Height.
+    version
+        .payload_writer()
+        .write_all(&0u32.to_le_bytes())
+        .unwrap();
+
+    version
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_version;
+
+    #[tokio::test]
+    async fn building_version_works_fine() {
+        let version = build_version();
+        let mut encoded = Vec::new();
+        version.write(&mut encoded).await;
+        assert_eq!(b"", encoded.as_slice());
     }
 }
