@@ -82,7 +82,14 @@ impl BitcoinMessage {
     }
 }
 
-fn build_version() -> BitcoinMessage {
+fn current_timetamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn build_version(timestamp: u64) -> BitcoinMessage {
     let mut version = BitcoinMessage::new();
 
     // Protocol version. 70015 was the highest by the time this was written.
@@ -98,10 +105,6 @@ fn build_version() -> BitcoinMessage {
         .unwrap();
 
     // Current timestamp.
-    let timestamp: u64 = std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
     version
         .payload_writer()
         .write_all(&timestamp.to_le_bytes())
@@ -167,9 +170,28 @@ mod tests {
 
     #[tokio::test]
     async fn building_version_works_fine() {
-        let version = build_version();
+        let version = build_version(0);
         let mut encoded = Vec::new();
         version.write(&mut encoded).await;
-        assert_eq!(b"", encoded.as_slice());
+        let expected = [
+            249, 190, 180, 217, // Magic.
+            118, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0, // Command.
+            85, 0, 0, 0, // Payload length.
+            154, 32, 106, 193, // Checksum.
+            // Payload starts here.
+            127, 17, 1, 0, // Protocol version.
+            0, 0, 0, 0, 0, 0, 0, 0, // Services.
+            0, 0, 0, 0, 0, 0, 0, 0, // Timestamp
+            0, 0, 0, 0, 0, 0, 0, 0, // Services of other node.
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // Ip
+            0, 0, // Port.
+            0, 0, 0, 0, 0, 0, 0, 0, // Services. Again?
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // Ip again
+            0, 0, // Port.
+            0, 0, 0, 0, 0, 0, 0, 0, // Nonce.
+            0, // Length of the User Agent.
+            0, 0, 0, 0, // height
+        ];
+        assert_eq!(expected, encoded.as_slice());
     }
 }
