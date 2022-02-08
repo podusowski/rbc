@@ -1,8 +1,8 @@
-use std::{net::SocketAddr, io::Write};
+use std::{io::Write, net::SocketAddr};
 
 use tokio::io::AsyncReadExt;
 
-use crate::protocol::BitcoinMessage;
+use crate::protocol::{build_version, BitcoinMessage, current_timestamp};
 
 mod protocol;
 mod utils;
@@ -13,81 +13,7 @@ async fn node(addr: SocketAddr) {
     let sock = tokio::net::TcpSocket::new_v4().unwrap();
     let mut stream = sock.connect(addr).await.unwrap();
 
-    let mut version = BitcoinMessage::new();
-
-    // Protocol version. 70015 was the highest by the time this was written.
-    version
-        .payload_writer()
-        .write_all(&70015u32.to_le_bytes())
-        .unwrap();
-
-    // Services. We support none.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // Current timestamp.
-    let timestamp: u64 = std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    version
-        .payload_writer()
-        .write_all(&timestamp.to_le_bytes())
-        .unwrap();
-
-    // Services of the other node. We support none.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // "The IPv6 address of the receiving node as perceived by the transmitting node"
-    version
-        .payload_writer()
-        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
-        .unwrap();
-
-    // Port. Note the Big Endian.
-    version
-        .payload_writer()
-        .write_all(&0u16.to_be_bytes())
-        .unwrap();
-
-    // Services. Again?
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // The IPv6 address of the transmitting node.
-    version
-        .payload_writer()
-        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
-        .unwrap();
-
-    // Port. Note the Big Endian.
-    version
-        .payload_writer()
-        .write_all(&0u16.to_be_bytes())
-        .unwrap();
-
-    // Nonce. Not important for now.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // Length of the user agent.
-    version.payload_writer().write_all(&[0]).unwrap();
-
-    // Height.
-    version
-        .payload_writer()
-        .write_all(&0u32.to_le_bytes())
-        .unwrap();
-
+    let mut version = build_version(current_timestamp());
     version.write(&mut stream).await;
 
     let ans = stream.read_u8().await.unwrap();

@@ -82,14 +82,14 @@ impl BitcoinMessage {
     }
 }
 
-fn current_timetamp() -> u64 {
+pub(crate) fn current_timestamp() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_secs()
 }
 
-fn build_version(timestamp: u64) -> BitcoinMessage {
+pub(crate) fn build_version(timestamp: u64) -> BitcoinMessage {
     let mut version = BitcoinMessage::new();
 
     // Protocol version. 70015 was the highest by the time this was written.
