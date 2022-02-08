@@ -7,14 +7,56 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 /// follows. Because of that, it's not possible to encode it in a single pass
 /// and some intermediate form is needed.
 pub(crate) struct BitcoinMessage {
+    new_header: BitcoinHeader,
     header: [u8; 4 + 12 + 4 + 4],
     // TODO: Optimize this!
     payload: Vec<u8>,
 }
 
+#[derive(Default)]
+pub(crate) struct BitcoinHeader {
+    magic: Magic,
+}
+
+impl BitcoinHeader {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        self.magic.write_to(sink)?;
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Magic;
+
+impl Magic {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&0xf9beb4d9u32.to_be_bytes())
+    }
+}
+
+struct Command {
+    command: &'static [u8],
+}
+
+impl Command {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        const MAX_LENGTH: usize = 12;
+        sink.write_all(self.command)?;
+        assert!(
+            self.command.len() <= MAX_LENGTH,
+            "command string is too long"
+        );
+        for _ in 0..MAX_LENGTH - self.command.len() {
+            sink.write(&[0])?;
+        }
+        Ok(())
+    }
+}
+
 impl BitcoinMessage {
     pub fn new() -> Self {
         let mut message = Self {
+            new_header: Default::default(),
             header: Default::default(),
             payload: Vec::new(),
         };
@@ -166,7 +208,29 @@ pub(crate) fn build_version(timestamp: u64) -> BitcoinMessage {
 
 #[cfg(test)]
 mod tests {
-    use super::build_version;
+    use super::*;
+
+    #[test]
+    fn when_writing_padded_bytes_smaller_data_gets_additional_padding() {
+        let mut sink = Vec::new();
+        Command {
+            command: b"version",
+        }
+        .write_to(&mut sink)
+        .unwrap();
+        assert_eq!(vec![118, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0], sink);
+    }
+
+    #[test]
+    #[should_panic = "command string is too long"]
+    fn panic_when_data_does_not_fit() {
+        let mut sink = Vec::new();
+        Command {
+            command: b"this text is too long to fit",
+        }
+        .write_to(&mut sink)
+        .unwrap();
+    }
 
     #[tokio::test]
     async fn building_version_works_fine() {
