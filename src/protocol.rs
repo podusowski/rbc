@@ -85,7 +85,7 @@ impl Command {
             "command string is too long"
         );
         for _ in 0..MAX_LENGTH - self.command.len() {
-            sink.write(&[0])?;
+            sink.write_all(&[0])?;
         }
         Ok(())
     }
