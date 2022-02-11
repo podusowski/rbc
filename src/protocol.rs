@@ -24,6 +24,9 @@ pub(crate) struct BitcoinHeader {
 impl BitcoinHeader {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         self.magic.write_to(sink)?;
+        self.command.write_to(sink)?;
+        self.payload_length.write_to(sink)?;
+        self.payload_hash.write_to(sink)?;
         Ok(())
     }
 }
@@ -63,15 +66,22 @@ trait BitconSerializable {
 
 /// Serialization for fixed-sized ints. Note: LE only.
 impl BitconSerializable for u32 {
-    fn write_to(&self, _: &mut impl Write) -> std::io::Result<()> {
-        todo!()
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.to_le_bytes())
     }
 }
 
 impl BitcoinMessage {
     pub fn new() -> Self {
         let mut message = Self {
-            new_header: Default::default(),
+            new_header: BitcoinHeader {
+                magic: Default::default(),
+                command: Command {
+                    command: b"version",
+                },
+                payload_length: 0,
+                payload_hash: 0,
+            },
             header: Default::default(),
             payload: Vec::new(),
         };
@@ -122,6 +132,9 @@ impl BitcoinMessage {
 
     pub async fn write(mut self, sink: &mut (impl AsyncWrite + Unpin)) {
         // Finalize the message.
+        self.new_header.payload_length = self.payload.len() as u32;
+        self.new_header.payload_hash = u32::from_le_bytes(self.calculate_payload_hash());
+
         let payload_len = self.payload.len() as u32;
         self.content_length()
             .copy_from_slice(&payload_len.to_le_bytes());
@@ -129,8 +142,12 @@ impl BitcoinMessage {
         let hash = self.calculate_payload_hash();
         self.payload_hash().copy_from_slice(&hash);
 
+        let mut encoded = Vec::new();
+        self.new_header.write_to(&mut encoded).unwrap();
+
         // Flush.
-        sink.write_all(&self.header).await.unwrap();
+        //sink.write_all(&self.header).await.unwrap();
+        sink.write_all(&encoded).await.unwrap();
         sink.write_all(&self.payload).await.unwrap();
     }
 
