@@ -1,11 +1,8 @@
+use crate::protocol::{build_version, current_timestamp};
 use std::net::SocketAddr;
-
 use tokio::io::AsyncReadExt;
 
-use crate::protocol::{build_version, current_timestamp};
-
 mod protocol;
-mod utils;
 
 async fn node(addr: SocketAddr) {
     // https://developer.bitcoin.org/devguide/p2p_network.html#connecting-to-peers
