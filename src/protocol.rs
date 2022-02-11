@@ -109,7 +109,6 @@ impl BitcoinMessage {
         self.header.write_to(&mut encoded).unwrap();
 
         // Flush.
-        //sink.write_all(&self.header).await.unwrap();
         sink.write_all(&encoded).await.unwrap();
         sink.write_all(&self.payload).await.unwrap();
     }
