@@ -2,10 +2,9 @@ use sha2::Digest;
 use std::{
     io::{Read, Write},
     net::Ipv6Addr,
-    process::Output,
 };
 
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 /// Something that can be serialized according to the Bitcoin protocol rules.
 pub(crate) trait BitcoinSerializable: Sized {
@@ -171,10 +170,6 @@ struct Version {
     // user_agent_string,
     start_height: u32,
 }
-
-struct VerAck;
-
-async fn decode(stream: &impl tokio::io::AsyncRead) {}
 
 impl BitcoinSerializable for Version {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
