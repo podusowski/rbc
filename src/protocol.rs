@@ -1,5 +1,5 @@
 use sha2::Digest;
-use std::io::Write;
+use std::{io::Write, net::Ipv6Addr};
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
@@ -8,13 +8,31 @@ trait BitcoinSerializable {
     fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
 }
 
-/// Serialization for fixed-sized ints. Note: LE only.
+impl BitcoinSerializable for u8 {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.to_le_bytes())
+    }
+}
+
+impl BitcoinSerializable for u16 {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.to_le_bytes())
+    }
+}
+
 impl BitcoinSerializable for u32 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
     }
 }
 
+impl BitcoinSerializable for u64 {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.to_le_bytes())
+    }
+}
+
+/// Part of every Bitcoin message.
 #[derive(Default)]
 pub(crate) struct BitcoinHeader {
     magic: Magic,
@@ -73,27 +91,64 @@ impl Command {
     }
 }
 
+impl BitcoinSerializable for Ipv6Addr {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.octets())
+    }
+}
+
+/// The “version” message provides information about the transmitting node to
+/// the receiving node at the beginning of a connection. Until both peers have
+/// exchanged “version” messages, no other messages will be accepted.
+/// https://developer.bitcoin.org/reference/p2p_networking.html#version
+struct Version {
+    version: u32,
+    services: u64,
+    timestamp: u64,
+    addr_recv_services: u64,
+    addr_recv_ip_address: Ipv6Addr,
+    addr_recv_port: u16,
+    addr_trans_services: u64,
+    addr_trans_ip_address: Ipv6Addr,
+    addr_trans_port: u16,
+    nonce: u64,
+    user_agent_bytes: u8,
+    // user_agent_string,
+    start_height: u32,
+}
+
+impl BitcoinSerializable for Version {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        self.version.write_to(sink)?;
+        self.services.write_to(sink)?;
+        self.timestamp.write_to(sink)?;
+        self.addr_recv_services.write_to(sink)?;
+        self.addr_recv_ip_address.write_to(sink)?;
+        self.addr_recv_port.write_to(sink)?;
+        self.addr_trans_services.write_to(sink)?;
+        self.addr_trans_ip_address.write_to(sink)?;
+        self.addr_trans_port.write_to(sink)?;
+        self.nonce.write_to(sink)?;
+        self.user_agent_bytes.write_to(sink)?;
+        // user_agent_string,
+        self.start_height.write_to(sink)
+    }
+}
+
 /// The Bitcoin message header contains length and checksum of the payload that
 /// follows. Because of that, it's not possible to encode it in a single pass
 /// and some intermediate form is needed.
 pub(crate) struct BitcoinMessage {
     header: BitcoinHeader,
     // TODO: Optimize this!
-    payload: Vec<u8>,
+    version: Version,
 }
 
 impl BitcoinMessage {
-    pub fn new() -> Self {
-        Self {
-            header: BitcoinHeader::new(b"version"),
-            payload: Vec::new(),
-        }
-    }
-
-    fn calculate_payload_hash(&self) -> [u8; 4] {
+    fn calculate_payload_hash(&self, data: &[u8]) -> [u8; 4] {
         // First pass.
         let mut hasher = sha2::Sha256::new();
-        hasher.update(&self.payload);
+        hasher.update(data);
         let first = hasher.finalize();
 
         // Second pass.
@@ -106,20 +161,20 @@ impl BitcoinMessage {
     }
 
     pub async fn write(mut self, sink: &mut (impl AsyncWrite + Unpin)) {
-        // Finalize the message.
-        self.header.payload_length = self.payload.len() as u32;
-        self.header.payload_hash = u32::from_le_bytes(self.calculate_payload_hash());
+        let mut encoded_payload = Vec::new();
+        self.version.write_to(&mut encoded_payload).unwrap();
 
-        let mut encoded = Vec::new();
-        self.header.write_to(&mut encoded).unwrap();
+        // Finalize the message.
+        self.header.payload_length = encoded_payload.len() as u32;
+        self.header.payload_hash =
+            u32::from_le_bytes(self.calculate_payload_hash(&encoded_payload));
+
+        let mut encoded_header = Vec::new();
+        self.header.write_to(&mut encoded_header).unwrap();
 
         // Flush.
-        sink.write_all(&encoded).await.unwrap();
-        sink.write_all(&self.payload).await.unwrap();
-    }
-
-    pub fn payload_writer(&mut self) -> &mut impl Write {
-        &mut self.payload
+        sink.write_all(&encoded_header).await.unwrap();
+        sink.write_all(&encoded_payload).await.unwrap();
     }
 }
 
@@ -131,78 +186,24 @@ pub(crate) fn current_timestamp() -> u64 {
 }
 
 pub(crate) fn build_version(timestamp: u64) -> BitcoinMessage {
-    let mut version = BitcoinMessage::new();
-
-    // Protocol version. 70015 was the highest by the time this was written.
-    version
-        .payload_writer()
-        .write_all(&70015u32.to_le_bytes())
-        .unwrap();
-
-    // Services. We support none.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // Current timestamp.
-    version
-        .payload_writer()
-        .write_all(&timestamp.to_le_bytes())
-        .unwrap();
-
-    // Services of the other node. We support none.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // "The IPv6 address of the receiving node as perceived by the transmitting node"
-    version
-        .payload_writer()
-        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
-        .unwrap();
-
-    // Port. Note the Big Endian.
-    version
-        .payload_writer()
-        .write_all(&0u16.to_be_bytes())
-        .unwrap();
-
-    // Services. Again?
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // The IPv6 address of the transmitting node.
-    version
-        .payload_writer()
-        .write_all(&std::net::Ipv6Addr::LOCALHOST.octets())
-        .unwrap();
-
-    // Port. Note the Big Endian.
-    version
-        .payload_writer()
-        .write_all(&0u16.to_be_bytes())
-        .unwrap();
-
-    // Nonce. Not important for now.
-    version
-        .payload_writer()
-        .write_all(&0u64.to_le_bytes())
-        .unwrap();
-
-    // Length of the user agent.
-    version.payload_writer().write_all(&[0]).unwrap();
-
-    // Height.
-    version
-        .payload_writer()
-        .write_all(&0u32.to_le_bytes())
-        .unwrap();
-
-    version
+    BitcoinMessage {
+        header: BitcoinHeader::new(b"version"),
+        version: Version {
+            version: 70015u32,
+            services: 0,
+            timestamp,
+            addr_recv_services: 0,
+            addr_recv_ip_address: Ipv6Addr::LOCALHOST,
+            addr_recv_port: 0,
+            addr_trans_services: 0,
+            addr_trans_ip_address: Ipv6Addr::LOCALHOST,
+            addr_trans_port: 0,
+            nonce: 0,
+            user_agent_bytes: 0,
+            // user_agent_string,
+            start_height: 0,
+        },
+    }
 }
 
 #[cfg(test)]
