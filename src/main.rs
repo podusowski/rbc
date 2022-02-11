@@ -1,4 +1,4 @@
-use crate::protocol::{build_version, current_timestamp, BitcoinHeader, BitcoinSerializable};
+use crate::protocol::{build_version, current_timestamp, Header, Piece};
 use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
 
@@ -15,7 +15,7 @@ async fn node(addr: SocketAddr) {
 
     let mut buf: [u8; 24] = Default::default();
     stream.read_exact(&mut buf).await.unwrap();
-    let header = BitcoinHeader::read_from(&mut buf.as_slice());
+    let header = Header::decode(&mut buf.as_slice());
     println!("{header:?}");
     //let ans = stream.read_u8().await.unwrap();
     //println!("{}", ans);
