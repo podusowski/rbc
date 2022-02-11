@@ -38,8 +38,10 @@ impl BitcoinSerializable for u32 {
         sink.write_all(&self.to_le_bytes())
     }
 
-    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn read_from(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Self::from_le_bytes(buf))
     }
 }
 

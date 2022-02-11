@@ -13,7 +13,7 @@ async fn node(addr: SocketAddr) {
     let version = build_version(current_timestamp());
     version.write(&mut stream).await;
 
-    let mut buf: [u8; 4] = Default::default();
+    let mut buf: [u8; 24] = Default::default();
     stream.read_exact(&mut buf).await.unwrap();
     let header = BitcoinHeader::read_from(&mut buf.as_slice());
     println!("{header:?}");
