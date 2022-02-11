@@ -1,16 +1,25 @@
 use sha2::Digest;
-use std::{io::Write, net::Ipv6Addr};
+use std::{
+    io::{Read, Write},
+    net::Ipv6Addr,
+    process::Output,
+};
 
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Something that can be serialized according to the Bitcoin protocol rules.
-trait BitcoinSerializable {
+pub(crate) trait BitcoinSerializable: Sized {
     fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self>;
 }
 
 impl BitcoinSerializable for u8 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
+    }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
     }
 }
 
@@ -18,11 +27,19 @@ impl BitcoinSerializable for u16 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
     }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
+    }
 }
 
 impl BitcoinSerializable for u32 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
+    }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
     }
 }
 
@@ -30,10 +47,14 @@ impl BitcoinSerializable for u64 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
     }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
+    }
 }
 
 /// Part of every Bitcoin message.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct BitcoinHeader {
     magic: Magic,
     command: Command,
@@ -45,7 +66,9 @@ impl BitcoinHeader {
     fn new(command: &'static [u8]) -> Self {
         BitcoinHeader {
             magic: Default::default(),
-            command: Command { command },
+            command: Command {
+                command: command.to_vec(),
+            },
             payload_length: 0,
             payload_hash: 0,
         }
@@ -60,26 +83,44 @@ impl BitcoinSerializable for BitcoinHeader {
         self.payload_hash.write_to(sink)?;
         Ok(())
     }
+
+    fn read_from(stream: &mut impl Read) -> std::io::Result<Self> {
+        Ok(BitcoinHeader {
+            magic: BitcoinSerializable::read_from(stream)?,
+            command: BitcoinSerializable::read_from(stream)?,
+            payload_length: BitcoinSerializable::read_from(stream)?,
+            payload_hash: BitcoinSerializable::read_from(stream)?,
+        })
+    }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Magic;
 
 impl BitcoinSerializable for Magic {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&0xf9beb4d9u32.to_be_bytes())
     }
+
+    fn read_from(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; 4] = Default::default();
+        stream.read_exact(&mut buf)?;
+        let magic = u32::from_be_bytes(buf);
+        // FIXME: Be more graceful.
+        assert_eq!(0xf9beb4d9u32, magic);
+        Ok(Magic)
+    }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Command {
-    command: &'static [u8],
+    command: Vec<u8>,
 }
 
-impl Command {
+impl BitcoinSerializable for Command {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         const MAX_LENGTH: usize = 12;
-        sink.write_all(self.command)?;
+        sink.write_all(&self.command)?;
         assert!(
             self.command.len() <= MAX_LENGTH,
             "command string is too long"
@@ -89,11 +130,23 @@ impl Command {
         }
         Ok(())
     }
+
+    fn read_from(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; 12] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Command {
+            command: Vec::from_iter(buf),
+        })
+    }
 }
 
 impl BitcoinSerializable for Ipv6Addr {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.octets())
+    }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
     }
 }
 
@@ -117,6 +170,10 @@ struct Version {
     start_height: u32,
 }
 
+struct VerAck;
+
+async fn decode(stream: &impl tokio::io::AsyncRead) {}
+
 impl BitcoinSerializable for Version {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         self.version.write_to(sink)?;
@@ -132,6 +189,10 @@ impl BitcoinSerializable for Version {
         self.user_agent_bytes.write_to(sink)?;
         // user_agent_string,
         self.start_height.write_to(sink)
+    }
+
+    fn read_from(_: &mut impl Read) -> std::io::Result<Self> {
+        todo!()
     }
 }
 
@@ -214,7 +275,7 @@ mod tests {
     fn when_writing_padded_bytes_smaller_data_gets_additional_padding() {
         let mut sink = Vec::new();
         Command {
-            command: b"version",
+            command: b"version".to_vec(),
         }
         .write_to(&mut sink)
         .unwrap();
@@ -226,7 +287,7 @@ mod tests {
     fn panic_when_data_does_not_fit() {
         let mut sink = Vec::new();
         Command {
-            command: b"this text is too long to fit",
+            command: b"this text is too long to fit".to_vec(),
         }
         .write_to(&mut sink)
         .unwrap();
