@@ -145,7 +145,7 @@ pub(crate) struct BitcoinMessage {
 }
 
 impl BitcoinMessage {
-    fn calculate_payload_hash(&self, data: &[u8]) -> [u8; 4] {
+    fn calculate_payload_hash(data: &[u8]) -> [u8; 4] {
         // First pass.
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
@@ -167,7 +167,7 @@ impl BitcoinMessage {
         // Finalize the message.
         self.header.payload_length = encoded_payload.len() as u32;
         self.header.payload_hash =
-            u32::from_le_bytes(self.calculate_payload_hash(&encoded_payload));
+            u32::from_le_bytes(Self::calculate_payload_hash(&encoded_payload));
 
         let mut encoded_header = Vec::new();
         self.header.write_to(&mut encoded_header).unwrap();

@@ -1,8 +1,8 @@
-use std::{io::Write, net::SocketAddr};
+use std::net::SocketAddr;
 
 use tokio::io::AsyncReadExt;
 
-use crate::protocol::{build_version, BitcoinMessage, current_timestamp};
+use crate::protocol::{build_version, current_timestamp};
 
 mod protocol;
 mod utils;
@@ -13,7 +13,7 @@ async fn node(addr: SocketAddr) {
     let sock = tokio::net::TcpSocket::new_v4().unwrap();
     let mut stream = sock.connect(addr).await.unwrap();
 
-    let mut version = build_version(current_timestamp());
+    let version = build_version(current_timestamp());
     version.write(&mut stream).await;
 
     let ans = stream.read_u8().await.unwrap();
