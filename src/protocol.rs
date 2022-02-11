@@ -7,7 +7,7 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 /// follows. Because of that, it's not possible to encode it in a single pass
 /// and some intermediate form is needed.
 pub(crate) struct BitcoinMessage {
-    new_header: BitcoinHeader,
+    header: BitcoinHeader,
     // TODO: Optimize this!
     payload: Vec<u8>,
 }
@@ -73,7 +73,7 @@ impl BitconSerializable for u32 {
 impl BitcoinMessage {
     pub fn new() -> Self {
         Self {
-            new_header: BitcoinHeader {
+            header: BitcoinHeader {
                 magic: Default::default(),
                 command: Command {
                     command: b"version",
@@ -102,11 +102,11 @@ impl BitcoinMessage {
 
     pub async fn write(mut self, sink: &mut (impl AsyncWrite + Unpin)) {
         // Finalize the message.
-        self.new_header.payload_length = self.payload.len() as u32;
-        self.new_header.payload_hash = u32::from_le_bytes(self.calculate_payload_hash());
+        self.header.payload_length = self.payload.len() as u32;
+        self.header.payload_hash = u32::from_le_bytes(self.calculate_payload_hash());
 
         let mut encoded = Vec::new();
-        self.new_header.write_to(&mut encoded).unwrap();
+        self.header.write_to(&mut encoded).unwrap();
 
         // Flush.
         //sink.write_all(&self.header).await.unwrap();
