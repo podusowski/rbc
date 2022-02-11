@@ -3,12 +3,13 @@ use std::io::Write;
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-trait BitconSerializable {
+/// Something that can be serialized according to the Bitcoin protocol rules.
+trait BitcoinSerializable {
     fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
 }
 
 /// Serialization for fixed-sized ints. Note: LE only.
-impl BitconSerializable for u32 {
+impl BitcoinSerializable for u32 {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&self.to_le_bytes())
     }
@@ -31,7 +32,9 @@ impl BitcoinHeader {
             payload_hash: 0,
         }
     }
+}
 
+impl BitcoinSerializable for BitcoinHeader {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         self.magic.write_to(sink)?;
         self.command.write_to(sink)?;
@@ -44,7 +47,7 @@ impl BitcoinHeader {
 #[derive(Default)]
 struct Magic;
 
-impl Magic {
+impl BitcoinSerializable for Magic {
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         sink.write_all(&0xf9beb4d9u32.to_be_bytes())
     }
