@@ -3,13 +3,15 @@ use std::io::Write;
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
-/// The Bitcoin message header contains length and checksum of the payload that
-/// follows. Because of that, it's not possible to encode it in a single pass
-/// and some intermediate form is needed.
-pub(crate) struct BitcoinMessage {
-    header: BitcoinHeader,
-    // TODO: Optimize this!
-    payload: Vec<u8>,
+trait BitconSerializable {
+    fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
+}
+
+/// Serialization for fixed-sized ints. Note: LE only.
+impl BitconSerializable for u32 {
+    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
+        sink.write_all(&self.to_le_bytes())
+    }
 }
 
 #[derive(Default)]
@@ -21,6 +23,15 @@ pub(crate) struct BitcoinHeader {
 }
 
 impl BitcoinHeader {
+    fn new(command: &'static [u8]) -> Self {
+        BitcoinHeader {
+            magic: Default::default(),
+            command: Command { command },
+            payload_length: 0,
+            payload_hash: 0,
+        }
+    }
+
     fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
         self.magic.write_to(sink)?;
         self.command.write_to(sink)?;
@@ -59,28 +70,19 @@ impl Command {
     }
 }
 
-trait BitconSerializable {
-    fn write_to(&self, _: &mut impl Write) -> std::io::Result<()>;
-}
-
-/// Serialization for fixed-sized ints. Note: LE only.
-impl BitconSerializable for u32 {
-    fn write_to(&self, sink: &mut impl Write) -> std::io::Result<()> {
-        sink.write_all(&self.to_le_bytes())
-    }
+/// The Bitcoin message header contains length and checksum of the payload that
+/// follows. Because of that, it's not possible to encode it in a single pass
+/// and some intermediate form is needed.
+pub(crate) struct BitcoinMessage {
+    header: BitcoinHeader,
+    // TODO: Optimize this!
+    payload: Vec<u8>,
 }
 
 impl BitcoinMessage {
     pub fn new() -> Self {
         Self {
-            header: BitcoinHeader {
-                magic: Default::default(),
-                command: Command {
-                    command: b"version",
-                },
-                payload_length: 0,
-                payload_hash: 0,
-            },
+            header: BitcoinHeader::new(b"version"),
             payload: Vec::new(),
         }
     }
