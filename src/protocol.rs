@@ -57,10 +57,10 @@ impl Piece for u64 {
 /// Part of every Bitcoin message.
 #[derive(Default, Debug)]
 pub(crate) struct Header {
-    magic: Magic,
-    command: Command,
-    payload_length: u32,
-    payload_hash: u32,
+    pub magic: Magic,
+    pub command: Command,
+    pub payload_length: u32,
+    pub payload_hash: u32,
 }
 
 impl Header {
@@ -96,7 +96,7 @@ impl Piece for Header {
 }
 
 #[derive(Default, Debug)]
-struct Magic;
+pub struct Magic;
 
 impl Piece for Magic {
     fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
@@ -113,9 +113,9 @@ impl Piece for Magic {
     }
 }
 
-#[derive(Default, Debug)]
-struct Command {
-    command: Vec<u8>,
+#[derive(Default, Debug, PartialEq)]
+pub struct Command {
+    pub command: Vec<u8>,
 }
 
 impl Piece for Command {
@@ -155,7 +155,7 @@ impl Piece for Ipv6Addr {
 /// the receiving node at the beginning of a connection. Until both peers have
 /// exchanged “version” messages, no other messages will be accepted.
 /// https://developer.bitcoin.org/reference/p2p_networking.html#version
-struct Version {
+pub struct Version {
     version: u32,
     services: u64,
     timestamp: u64,
@@ -169,6 +169,14 @@ struct Version {
     user_agent_bytes: u8,
     // user_agent_string,
     start_height: u32,
+}
+
+impl Version {
+    pub fn command() -> Command {
+        Command {
+            command: b"version".to_vec(),
+        }
+    }
 }
 
 impl Piece for Version {
