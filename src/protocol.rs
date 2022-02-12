@@ -4,7 +4,7 @@ use std::{
     net::Ipv6Addr,
 };
 
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 /// Something that can be coded and decoded according to the Bitcoin protocol rules.
 pub(crate) trait Piece: Sized {
@@ -161,6 +161,7 @@ impl Piece for Ipv6Addr {
 /// the receiving node at the beginning of a connection. Until both peers have
 /// exchanged “version” messages, no other messages will be accepted.
 /// https://developer.bitcoin.org/reference/p2p_networking.html#version
+#[derive(Debug)]
 pub struct Version {
     version: u32,
     services: u64,
@@ -200,8 +201,21 @@ impl Piece for Version {
         self.start_height.encode(sink)
     }
 
-    fn decode(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+        Ok(Self {
+            version: Piece::decode(stream)?,
+            services: Piece::decode(stream)?,
+            timestamp: Piece::decode(stream)?,
+            addr_recv_services: Piece::decode(stream)?,
+            addr_recv_ip_address: Piece::decode(stream)?,
+            addr_recv_port: Piece::decode(stream)?,
+            addr_trans_services: Piece::decode(stream)?,
+            addr_trans_ip_address: Piece::decode(stream)?,
+            addr_trans_port: Piece::decode(stream)?,
+            nonce: Piece::decode(stream)?,
+            user_agent_bytes: Piece::decode(stream)?,
+            start_height: Piece::decode(stream)?,
+        })
     }
 }
 
@@ -210,7 +224,6 @@ impl Piece for Version {
 /// and some intermediate form is needed.
 pub(crate) struct BitcoinMessage {
     header: Header,
-    // TODO: Optimize this!
     version: Version,
 }
 

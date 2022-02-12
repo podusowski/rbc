@@ -13,14 +13,19 @@ async fn node(addr: SocketAddr) {
     let version = build_version(current_timestamp());
     version.write(&mut stream).await;
 
+    // read incoming message
     let mut buf: [u8; 24] = Default::default();
     stream.read_exact(&mut buf).await.unwrap();
     let header = Header::decode(&mut buf.as_slice());
     println!("{header:?}");
     match header {
         Ok(header) => {
+            let mut buf = Vec::<u8>::with_capacity(header.payload_length as usize);
+            stream.read_exact(&mut buf).await.unwrap();
             if header.command == Version::command() {
                 println!("got version");
+                let version = Version::decode(&mut buf.as_slice()).unwrap();
+                println!("{:?}", version);
             } else {
                 println!("{:?}", std::str::from_utf8(&header.command.command));
             }
