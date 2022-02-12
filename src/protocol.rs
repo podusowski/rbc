@@ -67,9 +67,7 @@ impl Header {
     fn new(command: &'static [u8]) -> Self {
         Header {
             magic: Default::default(),
-            command: Command {
-                command: command.to_vec(),
-            },
+            command: Command::new(command),
             payload_length: 0,
             payload_hash: 0,
         }
@@ -115,7 +113,17 @@ impl Piece for Magic {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct Command {
-    pub command: Vec<u8>,
+    pub command: [u8; 12],
+}
+
+impl Command {
+    fn new(command: &'static [u8]) -> Self {
+        const MAX_LENGTH: usize = 12;
+        assert!(command.len() <= MAX_LENGTH, "command string is too long");
+        let mut cmd: [u8; 12] = Default::default();
+        cmd[..command.len()].copy_from_slice(command);
+        Self { command: cmd }
+    }
 }
 
 impl Piece for Command {
@@ -133,11 +141,9 @@ impl Piece for Command {
     }
 
     fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
-        let mut buf: [u8; 12] = Default::default();
-        stream.read_exact(&mut buf)?;
-        Ok(Command {
-            command: Vec::from_iter(buf),
-        })
+        let mut command: [u8; 12] = Default::default();
+        stream.read_exact(&mut command)?;
+        Ok(Command { command })
     }
 }
 
@@ -173,9 +179,7 @@ pub struct Version {
 
 impl Version {
     pub fn command() -> Command {
-        Command {
-            command: b"version".to_vec(),
-        }
+        Command::new(b"version")
     }
 }
 
@@ -279,23 +283,14 @@ mod tests {
     #[test]
     fn when_writing_padded_bytes_smaller_data_gets_additional_padding() {
         let mut sink = Vec::new();
-        Command {
-            command: b"version".to_vec(),
-        }
-        .encode(&mut sink)
-        .unwrap();
+        Command::new(b"version").encode(&mut sink).unwrap();
         assert_eq!(vec![118, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0], sink);
     }
 
     #[test]
     #[should_panic = "command string is too long"]
     fn panic_when_data_does_not_fit() {
-        let mut sink = Vec::new();
-        Command {
-            command: b"this text is too long to fit".to_vec(),
-        }
-        .encode(&mut sink)
-        .unwrap();
+        Command::new(b"this text is too long to fit");
     }
 
     #[tokio::test]
