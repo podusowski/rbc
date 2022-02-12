@@ -1,5 +1,5 @@
-use crate::protocol::{build_version, current_timestamp, Command, Header, Piece, Version};
-use std::{io::Read, net::SocketAddr};
+use crate::protocol::{build_version, current_timestamp, Header, Piece, Version};
+use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
 
 mod protocol;
