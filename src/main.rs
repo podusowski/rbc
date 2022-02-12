@@ -1,5 +1,5 @@
-use crate::protocol::{build_version, current_timestamp, Header, Piece, Command, Version};
-use std::{net::SocketAddr, io::Read};
+use crate::protocol::{build_version, current_timestamp, Command, Header, Piece, Version};
+use std::{io::Read, net::SocketAddr};
 use tokio::io::AsyncReadExt;
 
 mod protocol;
@@ -20,17 +20,13 @@ async fn node(addr: SocketAddr) {
     match header {
         Ok(header) => {
             if header.command == Version::command() {
-                println!("dupa");
-            }
-            else {
+                println!("got version");
+            } else {
                 println!("{:?}", std::str::from_utf8(&header.command.command));
             }
-
-        },
-        _ => panic!("bad")
+        }
+        _ => panic!("bad"),
     }
-    //let ans = stream.read_u8().await.unwrap();
-    //println!("{}", ans);
 }
 
 #[tokio::main]
