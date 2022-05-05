@@ -17,8 +17,10 @@ impl Piece for u8 {
         sink.write_all(&self.to_le_bytes())
     }
 
-    fn decode(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Self::from_le_bytes(buf))
     }
 }
 
@@ -27,8 +29,10 @@ impl Piece for u16 {
         sink.write_all(&self.to_le_bytes())
     }
 
-    fn decode(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Self::from_le_bytes(buf))
     }
 }
 
@@ -49,13 +53,15 @@ impl Piece for u64 {
         sink.write_all(&self.to_le_bytes())
     }
 
-    fn decode(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Self::from_le_bytes(buf))
     }
 }
 
 /// Part of every Bitcoin message.
-#[derive(Default, Debug)]
+#[derive(PartialEq, Default, Debug)]
 pub(crate) struct Header {
     pub magic: Magic,
     pub command: Command,
@@ -93,7 +99,7 @@ impl Piece for Header {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(PartialEq, Default, Debug)]
 pub struct Magic;
 
 impl Piece for Magic {
@@ -152,8 +158,10 @@ impl Piece for Ipv6Addr {
         sink.write_all(&self.octets())
     }
 
-    fn decode(_: &mut impl Read) -> std::io::Result<Self> {
-        todo!()
+    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+        let mut buf: [u8; 16] = Default::default();
+        stream.read_exact(&mut buf)?;
+        Ok(Self::from(buf))
     }
 }
 
@@ -161,7 +169,7 @@ impl Piece for Ipv6Addr {
 /// the receiving node at the beginning of a connection. Until both peers have
 /// exchanged “version” messages, no other messages will be accepted.
 /// https://developer.bitcoin.org/reference/p2p_networking.html#version
-#[derive(Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Version {
     version: u32,
     services: u64,
@@ -222,6 +230,7 @@ impl Piece for Version {
 /// The Bitcoin message header contains length and checksum of the payload that
 /// follows. Because of that, it's not possible to encode it in a single pass
 /// and some intermediate form is needed.
+#[derive(PartialEq)]
 pub(crate) struct BitcoinMessage {
     header: Header,
     version: Version,
@@ -309,6 +318,7 @@ mod tests {
     #[tokio::test]
     async fn building_version_works_fine() {
         let version = build_version(0);
+        let payload = version.version.clone();
         let mut encoded = Vec::new();
         version.write(&mut encoded).await;
         let expected = [
@@ -331,5 +341,11 @@ mod tests {
             0, 0, 0, 0, // height
         ];
         assert_eq!(expected, encoded.as_slice());
+
+        // See if it can be decoded again.
+        //let decoded = Version::decode(&mut expected[24..].to_vec().as_slice());
+        let decoded = Version::decode(&mut encoded.as_slice()).unwrap();
+
+        assert_eq!(payload, decoded);
     }
 }
