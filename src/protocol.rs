@@ -343,8 +343,9 @@ mod tests {
         assert_eq!(expected, encoded.as_slice());
 
         // See if it can be decoded again.
-        //let decoded = Version::decode(&mut expected[24..].to_vec().as_slice());
-        let decoded = Version::decode(&mut encoded.as_slice()).unwrap();
+        let mut read = encoded.as_slice();
+        let _ = Header::decode(&mut read); // Skip header.
+        let decoded = Version::decode(&mut read).unwrap();
 
         assert_eq!(payload, decoded);
     }
