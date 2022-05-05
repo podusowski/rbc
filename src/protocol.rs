@@ -4,7 +4,7 @@ use std::{
     net::Ipv6Addr,
 };
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 /// Something that can be coded and decoded according to the Bitcoin protocol rules.
 pub(crate) trait Piece: Sized {
