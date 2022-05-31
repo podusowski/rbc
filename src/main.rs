@@ -20,7 +20,7 @@ async fn node(addr: SocketAddr) {
     println!("{header:?}");
     match header {
         Ok(header) => {
-            let mut buf = Vec::<u8>::with_capacity(header.payload_length as usize);
+            let mut buf = vec![0; header.payload_length as usize];
             stream.read_exact(&mut buf).await.unwrap();
             if header.command == Version::command() {
                 println!("got version");
