@@ -12,53 +12,26 @@ pub(crate) trait Piece: Sized {
     fn decode(_: &mut impl Read) -> std::io::Result<Self>;
 }
 
-impl Piece for u8 {
-    fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
-        sink.write_all(&self.to_le_bytes())
-    }
+macro_rules! impl_piece_for_primitive {
+    ($type:ty) => {
+        impl Piece for $type {
+            fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
+                sink.write_all(&self.to_le_bytes())
+            }
 
-    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
-        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
-        stream.read_exact(&mut buf)?;
-        Ok(Self::from_le_bytes(buf))
-    }
+            fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
+                let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
+                stream.read_exact(&mut buf)?;
+                Ok(Self::from_le_bytes(buf))
+            }
+        }
+    };
 }
 
-impl Piece for u16 {
-    fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
-        sink.write_all(&self.to_le_bytes())
-    }
-
-    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
-        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
-        stream.read_exact(&mut buf)?;
-        Ok(Self::from_le_bytes(buf))
-    }
-}
-
-impl Piece for u32 {
-    fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
-        sink.write_all(&self.to_le_bytes())
-    }
-
-    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
-        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
-        stream.read_exact(&mut buf)?;
-        Ok(Self::from_le_bytes(buf))
-    }
-}
-
-impl Piece for u64 {
-    fn encode(&self, sink: &mut impl Write) -> std::io::Result<()> {
-        sink.write_all(&self.to_le_bytes())
-    }
-
-    fn decode(stream: &mut impl Read) -> std::io::Result<Self> {
-        let mut buf: [u8; std::mem::size_of::<Self>()] = Default::default();
-        stream.read_exact(&mut buf)?;
-        Ok(Self::from_le_bytes(buf))
-    }
-}
+impl_piece_for_primitive!(u8);
+impl_piece_for_primitive!(u16);
+impl_piece_for_primitive!(u32);
+impl_piece_for_primitive!(u64);
 
 /// Part of every Bitcoin message.
 #[derive(PartialEq, Default, Debug)]
