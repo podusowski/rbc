@@ -4,7 +4,7 @@ use std::{
     net::Ipv6Addr,
 };
 
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncWrite, AsyncRead, AsyncWriteExt, AsyncReadExt};
 
 /// Something that can be coded and decoded according to the Bitcoin protocol rules.
 pub(crate) trait Piece: Sized {
@@ -203,7 +203,7 @@ impl Piece for Version {
 /// The Bitcoin message header contains length and checksum of the payload that
 /// follows. Because of that, it's not possible to encode it in a single pass
 /// and some intermediate form is needed.
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct BitcoinMessage {
     header: Header,
     version: Version,
@@ -240,6 +240,24 @@ impl BitcoinMessage {
         // Flush.
         sink.write_all(&encoded_header).await.unwrap();
         sink.write_all(&encoded_payload).await.unwrap();
+    }
+
+    pub async fn read(stream: &mut (impl AsyncRead + Unpin)) -> BitcoinMessage {
+        let mut buf: [u8; 24] = Default::default();
+        stream.read_exact(&mut buf).await.unwrap();
+        let header = Header::decode(&mut buf.as_slice()).unwrap();
+
+        let mut buf = vec![0; header.payload_length as usize];
+        stream.read_exact(&mut buf).await.unwrap();
+
+        let version = if header.command == Version::command() {
+            println!("got version");
+            Version::decode(&mut buf.as_slice()).unwrap()
+        } else {
+            panic!("{:?}", std::str::from_utf8(&header.command.command));
+        };
+
+        BitcoinMessage { header, version }
     }
 }
 
@@ -317,9 +335,7 @@ mod tests {
 
         // See if it can be decoded again.
         let mut read = encoded.as_slice();
-        let _ = Header::decode(&mut read); // Skip header.
-        let decoded = Version::decode(&mut read).unwrap();
-
-        assert_eq!(payload, decoded);
+        let message = BitcoinMessage::read(&mut read).await;
+        assert_eq!(payload, message.version);
     }
 }

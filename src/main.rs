@@ -1,6 +1,5 @@
-use crate::protocol::{build_version, current_timestamp, Header, Piece, Version};
+use crate::protocol::{build_version, current_timestamp, BitcoinMessage};
 use std::net::SocketAddr;
-use tokio::io::AsyncReadExt;
 
 mod protocol;
 
@@ -13,25 +12,8 @@ async fn node(addr: SocketAddr) {
     let version = build_version(current_timestamp());
     version.write(&mut stream).await;
 
-    // read incoming message
-    let mut buf: [u8; 24] = Default::default();
-    stream.read_exact(&mut buf).await.unwrap();
-    let header = Header::decode(&mut buf.as_slice());
-    println!("{header:?}");
-    match header {
-        Ok(header) => {
-            let mut buf = vec![0; header.payload_length as usize];
-            stream.read_exact(&mut buf).await.unwrap();
-            if header.command == Version::command() {
-                println!("got version");
-                let version = Version::decode(&mut buf.as_slice()).unwrap();
-                println!("{:?}", version);
-            } else {
-                println!("{:?}", std::str::from_utf8(&header.command.command));
-            }
-        }
-        _ => panic!("bad"),
-    }
+    let incoming = BitcoinMessage::read(&mut stream).await;
+    println!("{:?}", incoming);
 }
 
 #[tokio::main]
