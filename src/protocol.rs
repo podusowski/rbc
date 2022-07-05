@@ -1,10 +1,7 @@
-use sha2::Digest;
 use std::{
     io::{Read, Write},
     net::Ipv6Addr,
 };
-
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Something that can be coded and decoded according to the Bitcoin protocol rules.
 pub(crate) trait Piece: Sized {
