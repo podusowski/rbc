@@ -4,7 +4,7 @@ use std::{
     net::Ipv6Addr,
 };
 
-use tokio::io::{AsyncWrite, AsyncRead, AsyncWriteExt, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Something that can be coded and decoded according to the Bitcoin protocol rules.
 pub(crate) trait Piece: Sized {
@@ -138,7 +138,6 @@ impl Piece for Ipv6Addr {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,38 +153,5 @@ mod tests {
     #[should_panic = "command string is too long"]
     fn panic_when_data_does_not_fit() {
         Command::new(b"this text is too long to fit");
-    }
-
-    #[tokio::test]
-    async fn building_version_works_fine() {
-        let version = build_version(0);
-        let payload = version.version.clone();
-        let mut encoded = Vec::new();
-        version.write(&mut encoded).await;
-        let expected = [
-            249, 190, 180, 217, // Magic.
-            118, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0, // Command.
-            85, 0, 0, 0, // Payload length.
-            154, 32, 106, 193, // Checksum.
-            // Payload starts here.
-            127, 17, 1, 0, // Protocol version.
-            0, 0, 0, 0, 0, 0, 0, 0, // Services.
-            0, 0, 0, 0, 0, 0, 0, 0, // Timestamp
-            0, 0, 0, 0, 0, 0, 0, 0, // Services of other node.
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // Ip
-            0, 0, // Port.
-            0, 0, 0, 0, 0, 0, 0, 0, // Services. Again?
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // Ip again
-            0, 0, // Port.
-            0, 0, 0, 0, 0, 0, 0, 0, // Nonce.
-            0, // Length of the User Agent.
-            0, 0, 0, 0, // height
-        ];
-        assert_eq!(expected, encoded.as_slice());
-
-        // See if it can be decoded again.
-        let mut read = encoded.as_slice();
-        let message = BitcoinMessage::read(&mut read).await;
-        assert_eq!(payload, message.version);
     }
 }
