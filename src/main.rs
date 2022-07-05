@@ -1,7 +1,8 @@
-use crate::protocol::{build_version, current_timestamp, BitcoinMessage};
+use crate::messages::{build_version, current_timestamp, BitcoinMessage};
 use std::net::SocketAddr;
 
 mod protocol;
+mod messages;
 
 async fn node(addr: SocketAddr) {
     // https://developer.bitcoin.org/devguide/p2p_network.html#connecting-to-peers
